@@ -1,0 +1,230 @@
+---
+title: "SPS DATA 607 Week 8 Group Project3"
+format: html
+editor: visual
+author: 
+  - Fraz Aslam
+  - David Chen
+---
+
+### Introduction
+
+Using data, investigate the question: 
+
+```         
+Which data science skills are most valued?
+```
+
+#### About Dataset
+
+Dataset: https://www.kaggle.com/datasets/asaniczka/data-science-job-postings-and-skills?select=job_postings.csv
+
+LinkedIn is a popular professional networking platform with millions of job postings across various industries.
+
+This dataset provides a raw dump of data science-related job postings collected from LinkedIn. It includes information about job titles, companies, locations, search parameters, and other relevant details.
+
+The main objective of this dataset is not only to provide insights into the data science job market and the skills required by professionals in this field but also to offer users an opportunity to practice their data cleaning skills.
+
+#### Data Acquisition and Storage
+
+The dataset used in this project was obtained from Kaggle: Data Science Job Postings and Skills. It contains job postings collected from LinkedIn and includes information such as job titles, company names, locations, and required skills for data-related positions. The dataset was downloaded as CSV files (e.g., job_postings.csv) and stored locally for analysis using R and RStudio.
+
+#### Data Preparation and Cleaning
+
+Before analysis, the dataset required preprocessing to ensure data quality. This process included removing missing or duplicate records, standardizing column names, and cleaning text fields such as job titles and skill lists. Additional transformations were performed to convert certain variables into appropriate formats and to extract relevant keywords for skill analysis. These steps ensured the dataset was consistent and ready for further analysis.
+
+#### Exploratory Data Analysis
+
+Exploratory Data Analysis (EDA) was conducted to better understand the structure and patterns within the dataset. Summary statistics and frequency counts were used to examine common job titles, locations, and skills mentioned in job postings. The analysis also explored relationships between variables, such as the distribution of skills across different data science roles and geographic locations.
+
+#### Visualization
+
+Data visualization techniques were used to present insights in a clear and interpretable way. Charts such as bar plots, word frequency charts, and geographic comparisons were used to highlight the most frequently requested skills and job roles. Visualizations helped identify trends in the data science job market and allowed us to compare skill demand across different job categories and locations.
+
+#### Research Questions / Objectives
+
+1.  Which skills are most frequently required in data science job postings?
+
+2.  How do the most in-demand skills vary across different data-related roles?
+
+3.  Is there a correlation between job location and the skills required for data science positions?
+
+4.  Can we identify patterns or trends in skill demand that could inform career development or hiring strategies?
+
+#### Expected Findings
+
+The analysis will identify the most in-demand skills by analyzing keyword frequency across different job postings and visualizing the most promising skills across various data-related roles. We will also explore whether there is any correlation between job location and the required skill sets, providing insights into geographic trends in data science skill demand.
+
+#### Communication
+
+-   Email
+
+-   Teams / Zoom
+
+-   Github
+
+-   Rstudio
+
+## Code base
+
+### Loading Libraries
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+```
+
+### Loading Data from Github
+
+```{r}
+posting_url <- "https://raw.githubusercontent.com/dyc-sps/SPS_DATA607_Week8/refs/heads/main/job_postings.csv"
+skill_url<-"https://raw.githubusercontent.com/dyc-sps/SPS_DATA607_Week8/refs/heads/main/job_skills.csv"
+```
+
+### Creating DataFrames and Preview of Data
+
+```{r}
+df_posting <-read.csv(posting_url)
+df_skill <- read.csv(skill_url)
+head(df_posting)
+head(df_skill)
+colnames(df_posting)
+colnames(df_skill)
+```
+
+### Data Cleaning and Analysis
+
+Creating a new dataframe that separates each skill from each individual listing into a new column
+
+```{r}
+#library(tidyr)
+df_skill_separate <- separate(df_skill, job_skills, into = paste0("col", 1:224), sep = ",", fill = "right")
+```
+
+The goal for the following code was to have a skill_count required from each job listing. Upon creating this column we found the data to have more than 226 columns or rather "226 skills required". This was being created from an outlier. There are a few job listings which have more than "100 skills required" in their job listing leading to the immense amount of columns. We ended up ignoring the following code and refining our approach.
+
+```{r}
+#library(dplyr)
+
+df_skill_separate <- df_skill_separate %>%
+  mutate(skill_count = rowSums(!is.na(.)))
+```
+
+This is our refined approach towards getting the frequency of each job-skill for all job listings. We take the dataframe and convert it into a long vector and convert everything into text. We split job skills into seperate string statements with strplit(), splitting at each comma. The data is cleaned up from any empty cells which are represented by empty strings using vals\[vals != ""\]. We create a new dataframe skill_df and use it for plotting.
+
+```{r}
+vals <- unlist(strsplit(as.character(unlist(df_skill)), ","))
+
+vals <- trimws(vals)
+vals <- vals[vals != ""]
+
+skill_df <- as.data.frame(sort(table(vals), decreasing = TRUE))
+
+```
+
+This plot visualizes the top 10 skill requirements by frequency after extracting and filtering data from the job_skills column.
+
+```{r}
+head(skill_df)
+#library(ggplot2)
+
+ggplot(skill_df[1:10, ], aes(x = vals, y = Freq)) +
+  geom_col(fill ="steelblue")+
+  scale_x_discrete(labels = function(x) gsub(" ", "\n", x))+
+   geom_text(aes(label = Freq), hjust = -0.1) +  # labels on right side
+  coord_flip() +                                  # horizontal bars
+  labs(x = "Skill Set", y = "Count", title = "Top 10 Job Skill Requirement") +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1)))+
+  theme_minimal()
+```
+
+```{r}
+summary(skill_df)
+str(skill_df)
+```
+
+With the following code we are joining the 2 dataframes in order to observe location with job skills and draw some conclusions
+
+```{r}
+#library(dplyr)
+
+df_combined <- inner_join(df_posting, df_skill, by = "job_link")
+head(df_combined)
+```
+
+```{r}
+#library(dplyr)
+
+df_localtion_level <- df_combined %>%
+  group_by(job_location, job_level) %>%
+  summarise(Count = n(), .groups = "drop") %>%
+  arrange(job_location, desc(Count))
+
+#df_localtion_level <- separate(df_localtion_level, job_location, into = paste0("col", 4:6), sep = ",", fill = "right")
+df_localtion_level <- separate(df_localtion_level, job_location, into = c("City","State","Country"), sep = ",", fill = "right")
+
+#trim out all spaces
+df_localtion_level <- df_localtion_level %>%
+  mutate(across(where(is.character), trimws))
+```
+
+```{r}
+df_localtion_level %>%
+  filter(State=="NY")%>%  
+  group_by(City) %>%
+  mutate(city_total = sum(Count)) %>%
+  ungroup() %>%
+  arrange(desc(city_total)) %>%
+  slice_head(n = 15)%>%
+  ggplot(aes(x = reorder(City, city_total), y = city_total, fill=City)) +
+  geom_text(aes(label = city_total),hjust = 0.1, vjust = -0.1)+
+  #coord_flip() + 
+  labs(x = "NY State", y = "Total Job Posting", title = "Each City in NY State Job Posting Chart") +
+  geom_col(position = "dodge")
+  
+```
+
+```{r}
+df_localtion_level %>%
+  #filter(State=="NY")%>%
+  group_by(City) %>%
+  mutate(city_total = sum(Count)) %>%
+  ungroup() %>%
+  arrange(desc(city_total)) %>%
+  slice_head(n = 20)%>%
+  ggplot(aes(x = reorder(City, city_total), y = city_total, fill=City)) +
+  geom_text(aes(label = city_total),hjust = 0.1, vjust = -0.1)+
+  #coord_flip() + 
+  labs(x = "City", y = "Total Job Posting", title = "Each City Job Posting Chart") +
+  geom_col(position = "dodge")
+```
+The Following code was designed to display the top 10 most popular jobs in New York based on the frequency they were posted. This is heavily based on the exact wording of the job title as provided by the linked in posting. Based on this we can see that Senior Data Engineer had the most postings and the word "Engineer" appears frequently in the job listings. 
+```{r}
+# Step 1 - create the top 10 separately first
+ny_top10 <- df_combined %>%
+  filter(grepl("NY", job_location)) %>%
+  count(job_title, sort = TRUE) %>%
+  slice(1:10)
+
+# Step 2 - check it looks right before plotting
+print(ny_top10)
+
+# Step 3 - plot only after confirming step 2 looks correct
+ggplot(ny_top10, aes(x = reorder(job_title, n), y = n)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  geom_text(aes(label = n),hjust = -0.1, vjust = -0.1)+
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1)))+
+  coord_flip() +
+  labs(
+    title = "Top 10 Most Popular Jobs in New York",
+    x = "",
+    y = "Number of Listings"
+  ) +
+  theme_minimal()+
+  theme(plot.title = element_text(hjust = 1))
+```
+
+## Conclusion
+
+The most notable part of our data analysis can be seen in the ggplot created for the skill set and the frequency of each skill set over 12,217 job postings on LinkedIn for 2024. Looking at the top 10 most in demand skills we can see that python and SQL fill the top 2 spots in that order. These technical skills are in demand with almost 4,800 mentions for each one. Most suprisngly , communication is the third most in demand skill in the 12,217 job listings. This speaks a-lot to the type of work a data scientist does, they aren't just creating models and displaying data. The graphs and data have to be explained to the consumer and to ones co-workers. The analysis of the data shows a balance between technical skills and soft-skills needed in the marketplace. R as a technical skill sits much lower than Python which can be attributed to the popularity and power of Python in today's market especially with libraries such as Pandas.
